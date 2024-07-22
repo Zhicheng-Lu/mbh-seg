@@ -19,6 +19,7 @@ class DataReader():
 		self.height = int(config['Image']['height'])
 
 		# Model
+		self.f_size = int(config['Model']['f_size'])
 		self.patch_size = int(config['Model']['patch_size'])
 		self.d_model = int(config['Model']['d_model'])
 		self.n_head = int(config['Model']['n_head'])
@@ -37,13 +38,13 @@ class DataReader():
 
 		for mode in ['train', 'test']:
 			for folder in folders[mode]:
-				img_paths = glob.glob(f'data/{folder}/{mode}/images/*')
+				imgs_paths = glob.glob(f'data/{folder}/{mode}/images/*')
 
-				for img_path in img_paths:
-					patient_id = img_path.split('/')[-1]
-					mask_path = f'data/{folder}/{mode}/masks/{patient_id}'
+				for imgs_path in imgs_paths:
+					patient_id = imgs_path.split('/')[-1]
+					masks_path = f'data/{folder}/{mode}/masks/{patient_id}'
 				
-					self.folders[mode].append((img_path, mask_path))
+					self.folders[mode].append((imgs_path, masks_path))
 
 		# Shuffle for random order
 		random.shuffle(self.folders['train'])
@@ -51,24 +52,26 @@ class DataReader():
 
 
 
-	def read_in_batch(self, img_path, mask_path, device):
-		# Read img and normalize to 0~1
-		img_nib_file = nib.load(img_path)
-		img = img_nib_file.get_fdata()
-		img = img - np.min(img)
-		img = img / np.max(img)
+	def read_in_batch(self, imgs_path, masks_path, device, to_torch=True):
+		# Read imgs and normalize to 0~1
+		imgs_nib_file = nib.load(imgs_path)
+		imgs = imgs_nib_file.get_fdata()
+		if to_torch:
+			imgs = imgs - np.min(imgs)
+			imgs = imgs / np.max(imgs)
 
-		img = torch.from_numpy(img)
-		img = img.to(device=device, dtype=torch.float)
+			imgs = torch.from_numpy(imgs)
+			imgs = imgs.to(device=device, dtype=torch.float)
 
-		# Read mask and change to integer
-		mask_nib_file = nib.load(mask_path)
-		mask = mask_nib_file.get_fdata()
-		mask = np.round(mask)
-		mask = mask.astype(int)
+		# Read masks and change to integer
+		masks_nib_file = nib.load(masks_path)
+		masks = masks_nib_file.get_fdata()
+		masks = np.round(masks)
+		masks = masks.astype(int)
 
-		mask = torch.from_numpy(mask)
-		mask = mask.type(torch.cuda.LongTensor).to(device)
-		mask = torch.moveaxis(mask, 2, 0)
+		if to_torch:
+			masks = torch.from_numpy(masks)
+			masks = masks.type(torch.cuda.LongTensor).to(device)
+			masks = torch.moveaxis(masks, 2, 0)
 
-		return img, mask
+		return imgs, masks
